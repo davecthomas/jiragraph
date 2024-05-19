@@ -300,7 +300,7 @@ def node_color(data):
 def node_border_color(status):
     border_colors = {
         'Open': 'red',
-        'In Progress': 'yellow',
+        'In Progress': 'orange',
         'Done': 'green',
         'Completed': 'green',
         'Closed': 'black',
@@ -386,12 +386,28 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
             .legend {{
                 position: absolute;
                 bottom: 20px;
-                right: 20px;
+                left: 20px;
                 background: white;
                 padding: 10px;
                 border: 1px solid lightgray;
                 border-radius: 5px;
                 box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            }}
+            .legend .node-color {{
+                display: inline-block;
+                width: 30px;
+                height: 14px;
+                border-radius: 3px;
+                margin-right: 5px;
+            }}
+            .legend .status-color {{
+                display: inline-block;
+                width: 30px;
+                height: 14px;
+                border-radius: 3px;
+                background-color: gray;
+                margin-right: 5px;
+                border: 3px solid;
             }}
             #mynetwork {{
                 width: 100%;
@@ -428,16 +444,16 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
             <div class="right">
                 <div id="mynetwork"></div>
                 <div class="legend">
-                    <h3>Legend</h3>
-                    <p><span style="color: red;">●</span> Bug</p>
-                    <p><span style="color: blue;">●</span> Task</p>
-                    <p><span style="color: green;">●</span> Story</p>
-                    <p><span style="color: orange;">●</span> Epic</p>
+                    <h3>Issue Types</h3>
+                    <p><span class="node-color" style="background-color: red;"></span> Bug</p>
+                    <p><span class="node-color" style="background-color: blue;"></span> Task</p>
+                    <p><span class="node-color" style="background-color: green;"></span> Story</p>
+                    <p><span class="node-color" style="background-color: orange;"></span> Epic</p>
                     <h3>Status Colors</h3>
-                    <p><span style="color: red;">■</span> Open</p>
-                    <p><span style="color: yellow;">■</span> In Progress</p>
-                    <p><span style="color: green;">■</span> Completed, Done</p>
-                    <p><span style="color: black;">■</span> Closed</p>
+                    <p><span class="status-color" style="border-color: red;"></span> Open</p>
+                    <p><span class="status-color" style="border-color: orange;"></span> In Progress</p>
+                    <p><span class="status-color" style="border-color: green;"></span> Completed, Done</p>
+                    <p><span class="status-color" style="border-color: black;"></span> Closed</p>
                 </div>
             </div>
         </div>
