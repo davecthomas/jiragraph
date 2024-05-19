@@ -287,18 +287,20 @@ def create_graph(field_mappings: Dict[str, str], issues: List):
 
 def node_color(data):
     colors = {
-        'Bug': 'red',
-        'Task': 'blue',
-        'Story': 'purple',
-        'Epic': 'orange',
-        'Parent': 'orange',  # synonym for Epic
-        'Subtask': 'lightblue'
+        'Bug': '#D14B4B',
+        'Epic': '#E69A4C',
+        'Parent': '#E69A4C',
+        'Story': '#B085C5',
+        'Subtask': 'lightblue',
+        'Task': '#6CA0DC',
+        'Tech Debt': '#D474D4'
     }
     return colors.get(data['type'] if 'type' in data else 'default_type', 'gray')
 
 
 def node_border_color(status):
     border_colors = {
+        'To Do': 'darkgray',
         'Open': 'chocolate',
         'In Progress': 'orange',
         'Done': 'green',
