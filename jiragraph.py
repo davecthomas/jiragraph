@@ -13,6 +13,13 @@ import difflib
 import re
 from networkx.readwrite import json_graph
 
+# TO DO:
+# css for better fonts in list
+# make left side independently scrollable
+# Put title in a separate section up top
+# Add a search bar to filter issues
+
+
 # Load environment variables
 load_dotenv()
 
@@ -292,10 +299,12 @@ def node_color(data):
 
 def node_border_color(status):
     border_colors = {
-        'Open': 'black',
+        'Open': 'red',
         'In Progress': 'yellow',
         'Done': 'green',
-        'Closed': 'red'
+        'Completed': 'green',
+        'Closed': 'black',
+        'Unknown': 'gray'
     }
     return border_colors.get(status, 'gray')
 
@@ -330,8 +339,9 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
     } for edge in data['links']])
 
     issue_list_items = ''.join(
-        [f'<li><a href="https://{JIRA_CO_URL}.atlassian.net/browse/{issue["key"]}" data-node-id="{issue["key"]}" class="issue-link">{issue["key"]}: {issue["fields"]["summary"][:64]}</a></li>'
-         for issue in issues])
+        [f'<li><a href="https://{JIRA_CO_URL}.atlassian.net/browse/{issue["key"]}" target="_blank" data-node-id="{issue["key"]}" class="issue-link">{issue["key"]}: {issue["fields"]["summary"][:64]}</a></li>'
+         for issue in issues]
+    )
 
     html_template = f"""
     <!DOCTYPE html>
@@ -344,13 +354,29 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
         <style>
             body {{
                 display: flex;
-                font-family: Arial, sans-serif;
+                flex-direction: column;
+                font-family: 'Roboto', sans-serif;
+                margin: 0;
+                height: 100vh;
+            }}
+            .header {{
+                text-align: center;
+                padding: 20px;
+                height: 2em;
+                background-color: #f5f5f5;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }}
+            .content {{
+                display: flex;
+                flex-grow: 1;
+                overflow: hidden;
             }}
             .left {{
                 width: 30%;
                 padding: 20px;
                 overflow-y: auto; /* Ensure scrolling if content overflows */
-                height: 100vh; /* Full height of the viewport */
+                background-color: #fafafa;
+                border-right: 1px solid #ddd;
             }}
             .right {{
                 width: 70%;
@@ -369,31 +395,50 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
             }}
             #mynetwork {{
                 width: 100%;
-                height: 750px;
+                height: 100%;
                 border: 1px solid lightgray;
             }}
+            ul {{
+                list-style-type: none;
+                padding: 0;
+            }}
+            li {{
+                margin-bottom: 10px;
+            }}
+            a.issue-link {{
+                text-decoration: none;
+                color: #007bff;
+            }}
+            a.issue-link:hover {{
+                text-decoration: underline;
+            }}
         </style>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     </head>
     <body>
-        <div class="left">
-            <h1>Jira Issues</h1>
-            <ul id="issueList">
-                {issue_list_items}
-            </ul>
+        <div class="header">
+            <h1>Jira Issues for {JQL_QUERY}</h1>
         </div>
-        <div class="right">
-            <div id="mynetwork"></div>
-            <div class="legend">
-                <h3>Legend</h3>
-                <p><span style="color: red;">●</span> Bug</p>
-                <p><span style="color: blue;">●</span> Task</p>
-                <p><span style="color: green;">●</span> Story</p>
-                <p><span style="color: orange;">●</span> Epic</p>
-                <h3>Status Colors</h3>
-                <p><span style="color: black;">■</span> Open</p>
-                <p><span style="color: yellow;">■</span> In Progress</p>
-                <p><span style="color: green;">■</span> Done</p>
-                <p><span style="color: red;">■</span> Closed</p>
+        <div class="content">
+            <div class="left">
+                <ul>
+                    {issue_list_items}
+                </ul>
+            </div>
+            <div class="right">
+                <div id="mynetwork"></div>
+                <div class="legend">
+                    <h3>Legend</h3>
+                    <p><span style="color: red;">●</span> Bug</p>
+                    <p><span style="color: blue;">●</span> Task</p>
+                    <p><span style="color: green;">●</span> Story</p>
+                    <p><span style="color: orange;">●</span> Epic</p>
+                    <h3>Status Colors</h3>
+                    <p><span style="color: red;">■</span> Open</p>
+                    <p><span style="color: yellow;">■</span> In Progress</p>
+                    <p><span style="color: green;">■</span> Completed, Done</p>
+                    <p><span style="color: black;">■</span> Closed</p>
+                </div>
             </div>
         </div>
         <script>
@@ -426,7 +471,6 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                         direction: 'LR',  // 'UD' is Up-Down, 'LR' is Left-Right
                         nodeSpacing: 10,
                         levelSeparation: 350,
-
                         blockShifting: true,
                         edgeMinimization: true,
                         parentCentralization: true,
@@ -466,9 +510,8 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                     enabled: true
                 }}
             }};
-            var network = new vis.Network(container, data, options);
 
-            document.querySelectorAll('#issueList a').forEach(function(link) {{
+            document.querySelectorAll('.issue-link').forEach(function(link) {{
                 link.addEventListener('click', function(event) {{
                     event.preventDefault();
                     var nodeId = this.getAttribute('data-node-id');
@@ -480,18 +523,35 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                         }}
                     }});
                     setTimeout(function() {{
-                        var newTab = window.open(link.href, '_blank', 'noopener,noreferrer');
+                        var newTab = window.open(link.href, '_blank');
                         if (newTab) {{
-                            newTab.opener = null; // Ensuring no opener
+                            newTab.blur();  // Unfocus the new tab
+                            window.focus();  // Refocus the current window
                         }}
                     }}, 1500); // Open the new tab after the animation
                 }});
             }});
 
+            var network = new vis.Network(container, data, options);
+
             network.on("selectNode", function(params) {{
-                var node = nodes.get(params.nodes[0]);
+                var nodeId = params.nodes[0];
+                network.focus(nodeId, {{
+                    scale: 1.5,
+                    animation: {{
+                        duration: 1000,
+                        easingFunction: 'easeInOutQuad'
+                    }}
+                }});
+                var node = nodes.get(nodeId);
                 if (node.url) {{
-                    window.open(node.url, '_blank');
+                    setTimeout(function() {{
+                        var newTab = window.open(node.url, '_blank');
+                        if (newTab) {{
+                            newTab.blur();
+                            window.focus();
+                        }}
+                    }}, 1500);
                 }}
             }});
             network.on("hoverNode", function(params) {{
