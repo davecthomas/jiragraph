@@ -289,7 +289,7 @@ def node_color(data):
     colors = {
         'Bug': 'red',
         'Task': 'blue',
-        'Story': 'green',
+        'Story': 'purple',
         'Epic': 'orange',
         'Parent': 'orange',  # synonym for Epic
         'Subtask': 'lightblue'
@@ -299,7 +299,7 @@ def node_color(data):
 
 def node_border_color(status):
     border_colors = {
-        'Open': 'red',
+        'Open': 'chocolate',
         'In Progress': 'orange',
         'Done': 'green',
         'Completed': 'green',
@@ -343,240 +343,13 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
          for issue in issues]
     )
 
-    html_template = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title>Jira Issues for {JQL_QUERY}</title>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
-        <style>
-            body {{
-                display: flex;
-                flex-direction: column;
-                font-family: 'Roboto', sans-serif;
-                margin: 0;
-                height: 100vh;
-            }}
-            .header {{
-                text-align: center;
-                padding: 20px;
-                height: 2em;
-                background-color: #f5f5f5;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            }}
-            .content {{
-                display: flex;
-                flex-grow: 1;
-                overflow: hidden;
-            }}
-            .left {{
-                width: 30%;
-                padding: 20px;
-                overflow-y: auto; /* Ensure scrolling if content overflows */
-                background-color: #fafafa;
-                border-right: 1px solid #ddd;
-            }}
-            .right {{
-                width: 70%;
-                padding: 20px;
-                position: relative; /* To position the legend absolutely */
-            }}
-            .legend {{
-                position: absolute;
-                bottom: 20px;
-                left: 20px;
-                background: white;
-                padding: 10px;
-                border: 1px solid lightgray;
-                border-radius: 5px;
-                box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-            }}
-            .legend .node-color {{
-                display: inline-block;
-                width: 30px;
-                height: 14px;
-                border-radius: 3px;
-                margin-right: 5px;
-            }}
-            .legend .status-color {{
-                display: inline-block;
-                width: 30px;
-                height: 14px;
-                border-radius: 3px;
-                background-color: gray;
-                margin-right: 5px;
-                border: 3px solid;
-            }}
-            #mynetwork {{
-                width: 100%;
-                height: 100%;
-                border: 1px solid lightgray;
-            }}
-            ul {{
-                list-style-type: none;
-                padding: 0;
-            }}
-            li {{
-                margin-bottom: 10px;
-            }}
-            a.issue-link {{
-                text-decoration: none;
-                color: #007bff;
-            }}
-            a.issue-link:hover {{
-                text-decoration: underline;
-            }}
-        </style>
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-    </head>
-    <body>
-        <div class="header">
-            <h1>Jira Issues for {JQL_QUERY}</h1>
-        </div>
-        <div class="content">
-            <div class="left">
-                <ul>
-                    {issue_list_items}
-                </ul>
-            </div>
-            <div class="right">
-                <div id="mynetwork"></div>
-                <div class="legend">
-                    <h3>Issue Types</h3>
-                    <p><span class="node-color" style="background-color: red;"></span> Bug</p>
-                    <p><span class="node-color" style="background-color: blue;"></span> Task</p>
-                    <p><span class="node-color" style="background-color: green;"></span> Story</p>
-                    <p><span class="node-color" style="background-color: orange;"></span> Epic</p>
-                    <h3>Status Colors</h3>
-                    <p><span class="status-color" style="border-color: red;"></span> Open</p>
-                    <p><span class="status-color" style="border-color: orange;"></span> In Progress</p>
-                    <p><span class="status-color" style="border-color: green;"></span> Completed, Done</p>
-                    <p><span class="status-color" style="border-color: black;"></span> Closed</p>
-                </div>
-            </div>
-        </div>
-        <script>
-            var nodes = new vis.DataSet({nodes});
-            var edges = new vis.DataSet({edges});
+    with open('template.html', 'r') as file:
+        html_template = file.read()
 
-            var container = document.getElementById('mynetwork');
-            var data = {{
-                nodes: nodes,
-                edges: edges
-            }};
-            var options = {{
-                physics: {{
-                    enabled: true,
-                    solver: 'forceAtlas2Based',
-                    forceAtlas2Based: {{
-                        gravitationalConstant: -50,
-                        centralGravity: 0.01,
-                        springLength: 100,
-                        springConstant: 0.08,
-                        avoidOverlap: 1
-                    }},
-                    maxVelocity: 50,
-                    minVelocity: 0.1,
-                    timestep: 0.5,
-                    stabilization: {{ iterations: 150 }}
-                }},
-                layout: {{
-                    hierarchical: {{
-                        direction: 'LR',  // 'UD' is Up-Down, 'LR' is Left-Right
-                        nodeSpacing: 10,
-                        levelSeparation: 350,
-                        blockShifting: true,
-                        edgeMinimization: true,
-                        parentCentralization: true,
-                        sortMethod: 'directed',  // hubsize, directed
-                        shakeTowards: 'roots'  // roots, leaves
-                    }}
-                }},
-                edges: {{
-                    font: {{
-                        align: 'horizontal'
-                    }},
-                    smooth: {{
-                        type: 'cubicBezier',
-                        forceDirection: 'vertical',
-                        roundness: 0.4
-                    }}
-                }},
-                nodes: {{
-                    shape: 'box',
-                    font: {{
-                        color: '#ffffff'
-                    }},
-                    widthConstraint: {{
-                        maximum: 300  // Set maximum width for nodes
-                    }},
-                    chosen: {{
-                        node: function(values, id, selected, hovering) {{
-                            values.shadowSize = selected ? 10 : 5;
-                        }}
-                    }}
-                }},
-                interaction: {{
-                    dragNodes: true, // Enable dragging of nodes
-                    hover: true, // Enable hovering
-                }},
-                manipulation: {{
-                    enabled: true
-                }}
-            }};
-
-            document.querySelectorAll('.issue-link').forEach(function(link) {{
-                link.addEventListener('click', function(event) {{
-                    event.preventDefault();
-                    var nodeId = this.getAttribute('data-node-id');
-                    network.focus(nodeId, {{
-                        scale: 1.5,
-                        animation: {{
-                            duration: 1000,
-                            easingFunction: 'easeInOutQuad'
-                        }}
-                    }});
-                    setTimeout(function() {{
-                        var newTab = window.open(link.href, '_blank');
-                        if (newTab) {{
-                            newTab.blur();  // Unfocus the new tab
-                            window.focus();  // Refocus the current window
-                        }}
-                    }}, 1500); // Open the new tab after the animation
-                }});
-            }});
-
-            var network = new vis.Network(container, data, options);
-
-            network.on("selectNode", function(params) {{
-                var nodeId = params.nodes[0];
-                network.focus(nodeId, {{
-                    scale: 1.5,
-                    animation: {{
-                        duration: 1000,
-                        easingFunction: 'easeInOutQuad'
-                    }}
-                }});
-                var node = nodes.get(nodeId);
-                if (node.url) {{
-                    setTimeout(function() {{
-                        var newTab = window.open(node.url, '_blank');
-                        if (newTab) {{
-                            newTab.blur();
-                            window.focus();
-                        }}
-                    }}, 1500);
-                }}
-            }});
-            network.on("hoverNode", function(params) {{
-                network.bringToFront(params.node);
-            }});
-        </script>
-    </body>
-    </html>
-    """
+    html_content = html_template.replace('{{JQL_QUERY}}', JQL_QUERY) \
+                                .replace('{{ISSUE_LIST_ITEMS}}', issue_list_items) \
+                                .replace('{{NODES}}', nodes) \
+                                .replace('{{EDGES}}', edges)
 
     if os.path.exists(filename):
         base, ext = os.path.splitext(filename)
@@ -588,7 +361,7 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
         filename = new_filename
 
     with open(filename, 'w') as f:
-        f.write(html_template)
+        f.write(html_content)
 
     print(f"Generated HTML file: {filename}")
 
