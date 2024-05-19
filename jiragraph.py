@@ -173,16 +173,15 @@ def get_jira_fields(required_fields: List = ['Epic Link']) -> Dict[str, str]:
 
         missing_fields = []
 
-        print("Fields found in Jira (keys):")
-        for field_name, field_key in field_keys.items():
-            print(f" - {field_name}: {field_key}")
+        # print("Fields found in Jira (keys):")
+        # for field_name, field_key in field_keys.items():
+        #     print(f" - {field_name}: {field_key}")
 
-        print("\nChecking for required fields:")
         for required_field in required_fields:
             if required_field in field_keys:
                 field_mappings[required_field] = field_keys[required_field]
-                print(f"Found required field: {
-                      required_field} -> {field_keys[required_field]}")
+                # print(f"Found required field: {
+                #       required_field} -> {field_keys[required_field]}")
             else:
                 closest_match = find_closest_field(
                     required_field, list(field_keys.values()))
@@ -198,8 +197,6 @@ def get_jira_fields(required_fields: List = ['Epic Link']) -> Dict[str, str]:
             print("\nMissing or unmatched required fields:")
             for missing_field in missing_fields:
                 print(f" - {missing_field}")
-        else:
-            print("\nAll required fields are present.")
 
     else:
         print("Failed to fetch fields from Jira.")
@@ -254,7 +251,7 @@ def create_graph(field_mappings: Dict[str, str], issues: List):
         issue_status = issue['fields'][issue_status_field]['name']
         summary = issue['fields'][issue_summary_field][:64]
 
-        G.add_node(issue_id, label=summary, type=issue_type,
+        G.add_node(issue_id, label=f"{issue_id}:{summary}", type=issue_type,
                    status=issue_status, url=construct_jira_issue_url(issue_id))
 
         if issue_parent_field in issue['fields']:
@@ -270,6 +267,14 @@ def create_graph(field_mappings: Dict[str, str], issues: List):
                            status='Unknown', url=construct_jira_issue_url(epic_id))
             G.add_edge(epic_id, issue_id, type='Epic')
 
+        if 'subtasks' in issue['fields']:
+            for subtask in issue['fields']['subtasks']:
+                subtask_id = subtask['key']
+                if subtask_id not in G:
+                    G.add_node(subtask_id, label=subtask['fields'][issue_summary_field][:64],
+                               type='Subtask', status='Unknown', url=construct_jira_issue_url(subtask_id))
+                G.add_edge(issue_id, subtask_id, type='Subtask')
+
     return G
 
 
@@ -278,7 +283,9 @@ def node_color(data):
         'Bug': 'red',
         'Task': 'blue',
         'Story': 'green',
-        'Epic': 'orange'
+        'Epic': 'orange',
+        'Parent': 'orange',  # synonym for Epic
+        'Subtask': 'lightblue'
     }
     return colors.get(data['type'] if 'type' in data else 'default_type', 'gray')
 
@@ -311,7 +318,7 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
             'background': node_color(node),
             'border': node_border_color(get_node_status(node['id']))
         },
-        'borderWidth': 4,
+        'borderWidth': 5,
         'url': node['url']
     } for node in data['nodes']])
     edges = json.dumps([{
@@ -323,16 +330,15 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
     } for edge in data['links']])
 
     issue_list_items = ''.join(
-        [f'<li><a href="https://{JIRA_CO_URL}.atlassian.net/browse/{issue["key"]}" target="_blank">{issue["key"]}: {issue["fields"]["summary"][:64]}</a></li>'
-         for issue in issues]
-    )
+        [f'<li><a href="https://{JIRA_CO_URL}.atlassian.net/browse/{issue["key"]}" data-node-id="{issue["key"]}" class="issue-link">{issue["key"]}: {issue["fields"]["summary"][:64]}</a></li>'
+         for issue in issues])
 
     html_template = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <title>Jira Issues and Network Graph</title>
+        <title>Jira Issues for {JQL_QUERY}</title>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.js"></script>
         <link href="https://cdnjs.cloudflare.com/ajax/libs/vis/4.21.0/vis.min.css" rel="stylesheet">
         <style>
@@ -371,7 +377,7 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
     <body>
         <div class="left">
             <h1>Jira Issues</h1>
-            <ul>
+            <ul id="issueList">
                 {issue_list_items}
             </ul>
         </div>
@@ -417,10 +423,15 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                 }},
                 layout: {{
                     hierarchical: {{
-                        direction: 'UD',  // 'UD' is Up-Down
-                        sortMethod: 'directed',
-                        nodeSpacing: 200,
-                        levelSeparation: 200
+                        direction: 'LR',  // 'UD' is Up-Down, 'LR' is Left-Right
+                        nodeSpacing: 10,
+                        levelSeparation: 350,
+
+                        blockShifting: true,
+                        edgeMinimization: true,
+                        parentCentralization: true,
+                        sortMethod: 'directed',  // hubsize, directed
+                        shakeTowards: 'roots'  // roots, leaves
                     }}
                 }},
                 edges: {{
@@ -439,7 +450,7 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                         color: '#ffffff'
                     }},
                     widthConstraint: {{
-                        maximum: 200  // Set maximum width for nodes
+                        maximum: 300  // Set maximum width for nodes
                     }},
                     chosen: {{
                         node: function(values, id, selected, hovering) {{
@@ -456,6 +467,26 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
                 }}
             }};
             var network = new vis.Network(container, data, options);
+
+            document.querySelectorAll('#issueList a').forEach(function(link) {{
+                link.addEventListener('click', function(event) {{
+                    event.preventDefault();
+                    var nodeId = this.getAttribute('data-node-id');
+                    network.focus(nodeId, {{
+                        scale: 1.5,
+                        animation: {{
+                            duration: 1000,
+                            easingFunction: 'easeInOutQuad'
+                        }}
+                    }});
+                    setTimeout(function() {{
+                        var newTab = window.open(link.href, '_blank', 'noopener,noreferrer');
+                        if (newTab) {{
+                            newTab.opener = null; // Ensuring no opener
+                        }}
+                    }}, 1500); // Open the new tab after the animation
+                }});
+            }});
 
             network.on("selectNode", function(params) {{
                 var node = nodes.get(params.nodes[0]);
@@ -483,6 +514,8 @@ def generate_html_with_graph(field_mappings: Dict[str, str], issues: List, filen
     with open(filename, 'w') as f:
         f.write(html_template)
 
+    print(f"Generated HTML file: {filename}")
+
 
 def main():
     # test
@@ -491,6 +524,7 @@ def main():
     field_mappings['Summary'] = 'summary'
     field_mappings['Status'] = 'status'
     field_mappings['Issue Type'] = 'issuetype'
+    field_mappings['Subtasks'] = 'subtasks'
     field_ids: List[str] = list(field_mappings.values())
     issues = fetch_jira_issues(field_ids)
     generate_html_with_graph(field_mappings, issues)
